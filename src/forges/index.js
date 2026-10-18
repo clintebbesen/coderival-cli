@@ -23,7 +23,7 @@ export function whoami(forge) {
 }
 
 /**
- * @param {Forge & { fetchImpl?: typeof fetch, onWait?: (ms: number) => void }} forge
+ * @param {Forge & { token: string, fetchImpl?: typeof fetch, onWait?: (ms: number) => void }} forge
  * @param {{ from: string, to: string }} window
  * @returns {Promise<Record<string, { prs: number, commits: number }>>}
  */

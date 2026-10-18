@@ -1,3 +1,3 @@
 {"type":"user","uuid":"s-1","isSidechain":true,"timestamp":"2026-10-17T10:00:00.000Z","message":{"role":"user","content":"made-up subagent task"}}
-{"type":"assistant","uuid":"s-2","isSidechain":true,"timestamp":"2026-10-17T10:00:30.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t9","name":"Read","input":{}}]}}
+{"type":"assistant","uuid":"s-2","isSidechain":true,"timestamp":"2026-10-17T10:00:30.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t9","name":"Read","input":{}}],"id":"msg_made_up_9","usage":{"input_tokens":100,"output_tokens":100}}}
 {"type":"user","uuid":"s-3","isSidechain":true,"timestamp":"2026-10-17T10:02:30.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t9","content":"x"}]}}

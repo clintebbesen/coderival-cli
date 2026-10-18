@@ -4,6 +4,7 @@ import { VERSION } from "./version.js";
 
 /**
  * @typedef {{ provider: "github" | "gitlab", host: string, username: string, days: Record<string, { prs: number, commits: number }> }} ForgeTotals
+ * @typedef {{ source: "logs", days: Record<string, number> } | { source: "cliproxy", host: string, days: Record<string, number> }} TokenTotals
  */
 
 /**
@@ -12,9 +13,10 @@ import { VERSION } from "./version.js";
  *   window: { from: string, to: string },
  *   agentDays?: Record<string, Record<string, number>>,
  *   forges?: ForgeTotals[],
+ *   tokens?: TokenTotals,
  * }} input
  */
-export function buildReport({ device, window, agentDays, forges }) {
+export function buildReport({ device, window, agentDays, forges, tokens }) {
   /** @type {Record<string, unknown>} */
   const report = {
     client: { name: "coderival-cli", version: VERSION },
@@ -30,6 +32,7 @@ export function buildReport({ device, window, agentDays, forges }) {
       days: dropEmptyDays(forge.days),
     }));
   }
+  if (tokens) report.tokens = tokens;
   return report;
 }
 

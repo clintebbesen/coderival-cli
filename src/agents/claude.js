@@ -2,8 +2,12 @@
 // Classify Claude Code transcript lines (~/.claude/projects/**/*.jsonl).
 // Only the line type, timestamp, uuid and the *kind* of user content are read. Message text is never kept.
 
+import { claudeUsageTotal } from "./tokens.js";
+
 /**
- * @typedef {import("./sessions.js").AgentEvent & { uuid?: string }} ClaudeEvent
+ * msgId and tokens are set on assistant lines that carry usage. Streaming writes one message over several
+ * lines with the same msgId; `out` (output tokens) picks the most complete one.
+ * @typedef {import("./sessions.js").AgentEvent & { uuid?: string, msgId?: string, tokens?: number, out?: number }} ClaudeEvent
  */
 
 /**
@@ -34,5 +38,13 @@ export function parseClaudeLine(text) {
   if (line.type !== "user" && line.type !== "assistant") return null;
   const t = Date.parse(line.timestamp);
   if (!Number.isFinite(t)) return null;
-  return { t, prompt: isClaudePrompt(line), uuid: typeof line.uuid === "string" ? line.uuid : undefined };
+  /** @type {ClaudeEvent} */
+  const event = { t, prompt: isClaudePrompt(line), uuid: typeof line.uuid === "string" ? line.uuid : undefined };
+  const usage = line.type === "assistant" ? line.message?.usage : undefined;
+  if (usage && typeof line.message?.id === "string") {
+    event.msgId = line.message.id;
+    event.tokens = claudeUsageTotal(usage);
+    event.out = Number(usage.output_tokens) || 0;
+  }
+  return event;
 }

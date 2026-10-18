@@ -1,5 +1,5 @@
 // @ts-check
-// Walk the Claude Code and Codex log folders and total agent time per UTC day.
+// Walk the Claude Code and Codex log folders once and total agent time and tokens per UTC day.
 import { createReadStream } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -9,6 +9,7 @@ import { windowStartIso } from "../days.js";
 import { parseClaudeLine } from "./claude.js";
 import { parseCodexLine } from "./codex.js";
 import { addSessionTime, toSeconds } from "./sessions.js";
+import { addCodexTokens, addTokens, cleanTokenDays } from "./tokens.js";
 
 /** @param {NodeJS.ProcessEnv} [env] */
 export function defaultAgentDirs(env = process.env) {
@@ -64,7 +65,7 @@ async function readEvents(path, parse) {
 
 /**
  * @param {{ window: { from: string, to: string }, claudeDirs?: string[], codexDirs?: string[], onFile?: (tool: string, path: string) => void }} options
- * @returns {Promise<{ days: Record<string, Record<string, number>>, files: { claude: number, codex: number } }>}
+ * @returns {Promise<{ days: Record<string, Record<string, number>>, tokens: Record<string, number>, files: { claude: number, codex: number } }>}
  */
 export async function collectAgentDays(options) {
   const defaults = defaultAgentDirs();
@@ -74,6 +75,11 @@ export async function collectAgentDays(options) {
   /** @type {import("./sessions.js").DayTotalsMs} */
   const totals = {};
   const files = { claude: 0, codex: 0 };
+  /** @type {Record<string, number>} */
+  const tokens = {};
+  // One Claude message id counted once, across streaming lines and copied files: keep the most complete line.
+  /** @type {Map<string, { t: number, tokens: number, out: number }>} */
+  const messages = new Map();
 
   // Resumed or forked Claude sessions copy earlier lines into a new file; skip any uuid already counted.
   const seen = new Set();
@@ -87,17 +93,25 @@ export async function collectAgentDays(options) {
         return true;
       });
       addSessionTime(events, "claude", window, totals);
+      for (const event of events) {
+        if (!event.msgId) continue;
+        const known = messages.get(event.msgId);
+        if (!known || (event.out ?? 0) > known.out) messages.set(event.msgId, { t: event.t, tokens: event.tokens ?? 0, out: event.out ?? 0 });
+      }
       files.claude += 1;
     }
   }
+  for (const message of messages.values()) addTokens(tokens, message.t, message.tokens, window);
 
   for (const dir of codexDirs) {
     for await (const path of jsonlFiles(dir, sinceMs)) {
       onFile?.("codex", path);
-      addSessionTime(await readEvents(path, parseCodexLine), "codex", window, totals);
+      const events = await readEvents(path, parseCodexLine);
+      addSessionTime(events, "codex", window, totals);
+      addCodexTokens(events, tokens, window);
       files.codex += 1;
     }
   }
 
-  return { days: toSeconds(totals), files };
+  return { days: toSeconds(totals), tokens: cleanTokenDays(tokens), files };
 }

@@ -76,4 +76,7 @@ test("collectAgentDays totals fixture sessions, subagents and skips resumed copi
   // Codex 400s (10 + 300 + 10, idle across the turn break, then 20 + 60).
   assert.deepEqual(result.days, { "2026-10-17": { claude: 1130, codex: 400 } });
   assert.deepEqual(result.files, { claude: 3, codex: 1 });
+  // Claude: msg 1 (1160, its smaller streaming line ignored) + msg 2 (2105) + msg 3 (10) + subagent (200), each once
+  // although the resumed copy repeats them. Codex: running total steps 1000 + 500 + 0 + 300.
+  assert.deepEqual(result.tokens, { "2026-10-17": 3475 + 1800 });
 });
