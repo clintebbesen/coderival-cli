@@ -1,0 +1,33 @@
+{
+  "name": "coderival",
+  "version": "0.1.0",
+  "description": "Open-source CodeRival client: sends only your daily coding totals, never code.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "coderival": "bin/coderival.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "typecheck": "tsc -p jsconfig.json",
+    "check": "npm run -s typecheck && npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clintebbesen/coderival-cli.git"
+  },
+  "homepage": "https://coderival.cesolutions.dev",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
