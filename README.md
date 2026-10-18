@@ -113,7 +113,7 @@ the site labels it Attested. Numbers the site fetches itself from GitHub or GitL
 | `coderival proxy service` | Print a systemd user service or launchd hint for the collector (installs nothing) |
 | `coderival remove HOST` | Remove a forge (all accounts on that host) or the CLIProxyAPI |
 | `coderival status` | Show what is set up |
-| `coderival schedule` | Print a crontab line to run it every hour (installs nothing) |
+| `coderival schedule` | Print a crontab line to run it every 6 hours at a random minute (installs nothing). The site takes one upload per computer every 6 hours; an earlier run sends nothing and exits cleanly |
 
 Options: `--dry-run`, `--days N` (default 400 on the first sync, then 35), `--no-agents`, `--no-forges`,
 `--no-tokens`, `--quiet` (cron: errors and one summary line; never starts a login), `--no-login`,

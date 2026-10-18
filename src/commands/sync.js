@@ -6,6 +6,7 @@ import { addDays, windowFor } from "../days.js";
 import { collectForge } from "../forges/index.js";
 import { daysInWindow, loadProxyTokens } from "../proxy/cliproxy.js";
 import { buildReport, sumSince } from "../report.js";
+import { HttpError } from "../http.js";
 import { getMe, sendReport } from "../server.js";
 import { resolveToken } from "../token-command.js";
 import { login } from "./login.js";
@@ -44,8 +45,10 @@ export async function sync(config, options, deps = {}) {
 
   /** @type {Set<string>} */
   const verified = new Set();
-  if (config.token && options.forges && config.forges.length) {
+  if (config.token && !options.dryRun) {
+    // One small request first: if the site would refuse the numbers (sent too recently), skip all the counting.
     const me = await getMe(config.server, config.token, fetchImpl);
+    if (me.nextReportAt && Date.parse(me.nextReportAt) > now.getTime()) return tooSoon(me.nextReportAt, me.minGapHours, now, options, logAll);
     for (const forge of me.verifiedForges ?? []) verified.add(forgeKey(forge.host, forge.username));
   }
 
@@ -107,7 +110,13 @@ export async function sync(config, options, deps = {}) {
     return { report, sent: false };
   }
 
-  const response = await sendReport(config.server, /** @type {string} */ (config.token), report, fetchImpl);
+  let response;
+  try {
+    response = await sendReport(config.server, /** @type {string} */ (config.token), report, fetchImpl);
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 429 && error.body?.nextAt) return tooSoon(error.body.nextAt, undefined, now, options, logAll);
+    throw error;
+  }
   config.lastSync = now.toISOString();
   await saveConfig(config);
   for (const forge of response.accepted?.forges ?? []) {
@@ -165,4 +174,19 @@ function summarise(report, since, log) {
     const totals = sumSince(forge.days, since);
     log(`  ${forge.username} on ${forge.host}: ${totals.prs ?? 0} merged, ${totals.commits ?? 0} commits`);
   }
+}
+
+/**
+ * The site takes one upload per computer every few hours. Too early is not an error: say when, send nothing.
+ * @param {string} nextAt
+ * @param {number | undefined} hours
+ * @param {Date} now
+ * @param {import("../args.js").CliOptions} options
+ * @param {(line: string) => void} log
+ */
+function tooSoon(nextAt, hours, now, options, log) {
+  const when = new Date(nextAt).toLocaleString();
+  const gap = hours ? ` in the last ${hours} hours` : " recently";
+  log(options.quiet ? `${now.toISOString()} not sent: this computer already sent${gap}; next after ${nextAt}` : `This computer already sent its numbers${gap}. Nothing sent; try again after ${when}.`);
+  return { report: null, sent: false, tooSoon: true };
 }

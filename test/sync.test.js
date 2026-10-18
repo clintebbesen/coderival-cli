@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { parseCli } from "../src/args.js";
 import { sync } from "../src/commands/sync.js";
 import { configPath, loadConfig, saveConfig } from "../src/config.js";
+import { scheduleLine } from "../src/commands/status.js";
 import { buildReport } from "../src/report.js";
 import { VERSION } from "../src/version.js";
 import { fakeFetch } from "./helpers.js";
@@ -135,4 +136,37 @@ test("forge tokens can come from a command, and quiet runs never start a login",
   assert.deepEqual(used, ["from-command"]);
   await assert.rejects(sync(config, parseCli(["--quiet"]), { collectAgents, collect, now, log: () => {} }), /Not logged in/);
   await assert.rejects(sync(config, parseCli(["--no-login"]), { collectAgents, collect, now, log: () => {} }), /Not logged in/);
+});
+
+test("a run before the site's next upload time counts nothing and sends nothing", async () => {
+  const config = await tempConfig();
+  config.token = "cr_token";
+  let counted = 0;
+  const lines = /** @type {string[]} */ ([]);
+  const { impl, calls } = fakeFetch(({ url }) => {
+    if (url.pathname === "/api/cli/me") return { body: { profile: { slug: "dev", name: "Dev", url: "x" }, verifiedForges: [], nextReportAt: "2026-10-18T09:00:00.000Z", minGapHours: 6 } };
+    return { status: 500 };
+  });
+  const result = await sync(config, parseCli(["--quiet"]), { fetchImpl: impl, collectAgents: async () => { counted += 1; return collectAgents(); }, collect, now, log: (l) => lines.push(l) });
+  assert.equal(result.sent, false);
+  assert.equal(counted, 0);
+  assert.deepEqual(calls.map((c) => c.url.pathname), ["/api/cli/me"]);
+  assert.match(lines.join("\n"), /not sent: this computer already sent in the last 6 hours; next after 2026-10-18T09:00:00.000Z/);
+});
+
+test("a 'too soon' answer to the upload is reported once, never retried", async () => {
+  const config = await tempConfig();
+  config.token = "cr_token";
+  const { impl, calls } = fakeFetch(({ url }) => {
+    if (url.pathname === "/api/cli/me") return { body: { profile: { slug: "dev", name: "Dev", url: "x" }, verifiedForges: [] } };
+    return { status: 429, headers: { "retry-after": "21000" }, body: { error: "too soon", nextAt: "2026-10-18T11:00:00.000Z" } };
+  });
+  const result = await sync(config, parseCli(["--quiet", "--no-forges"]), { fetchImpl: impl, collectAgents, collect, now, log: () => {} });
+  assert.equal(result.sent, false);
+  assert.equal(calls.filter((c) => c.url.pathname === "/api/cli/report").length, 1);
+});
+
+test("the suggested schedule is every 6 hours at a random minute", () => {
+  assert.match(scheduleLine(() => 0.5), /^30 3,9,15,21 \* \* \* npx /);
+  assert.match(scheduleLine(() => 0), /^0 0,6,12,18 /);
 });
