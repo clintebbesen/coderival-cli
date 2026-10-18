@@ -1,5 +1,6 @@
 // @ts-check
 // Calls to the CodeRival site. Only the CodeRival token is sent here, never a forge token.
+// No automatic retries: a "too soon" answer from the site means wait hours, not seconds.
 import { requestJson, requestOk } from "./http.js";
 
 /**
@@ -17,7 +18,7 @@ const url = (server, path) => `${server.replace(/\/+$/, "")}${path}`;
  * @returns {Promise<{ deviceCode: string, userCode: string, verifyUrl: string, interval: number, expiresIn: number }>}
  */
 export async function startDeviceLogin(server, deviceName, fetchImpl) {
-  return (await requestOk(url(server, "/api/cli/device"), { method: "POST", body: { deviceName }, fetchImpl })).body;
+  return (await requestOk(url(server, "/api/cli/device"), { method: "POST", body: { deviceName }, fetchImpl, retries: 0 })).body;
 }
 
 /**
@@ -27,7 +28,7 @@ export async function startDeviceLogin(server, deviceName, fetchImpl) {
  * @returns {Promise<{ status: "pending" } | { status: "done", token: string, profile: Profile }>}
  */
 export async function pollDeviceLogin(server, deviceCode, fetchImpl) {
-  const result = await requestJson(url(server, "/api/cli/device/poll"), { method: "POST", body: { deviceCode }, fetchImpl });
+  const result = await requestJson(url(server, "/api/cli/device/poll"), { method: "POST", body: { deviceCode }, fetchImpl, retries: 0 });
   if (result.status === 428) return { status: "pending" };
   if (result.status === 200) return { status: "done", token: result.body.token, profile: result.body.profile };
   if (result.status === 410) throw new Error(result.body?.error || "The login code expired or was denied. Run `coderival login` again.");
@@ -38,10 +39,10 @@ export async function pollDeviceLogin(server, deviceCode, fetchImpl) {
  * @param {string} server
  * @param {string} token
  * @param {typeof fetch} [fetchImpl]
- * @returns {Promise<{ profile: Profile, verifiedForges: VerifiedForge[] }>}
+ * @returns {Promise<{ profile: Profile, verifiedForges: VerifiedForge[], nextReportAt?: string | null, minGapHours?: number }>}
  */
 export async function getMe(server, token, fetchImpl) {
-  return (await requestOk(url(server, "/api/cli/me"), { headers: { authorization: `Bearer ${token}` }, fetchImpl })).body;
+  return (await requestOk(url(server, "/api/cli/me"), { headers: { authorization: `Bearer ${token}` }, fetchImpl, retries: 0 })).body;
 }
 
 /**
@@ -52,5 +53,5 @@ export async function getMe(server, token, fetchImpl) {
  * @returns {Promise<{ ok: boolean, profileUrl: string, accepted: { agentDays: number, forges: { host: string, username: string, status: string }[] } }>}
  */
 export async function sendReport(server, token, payload, fetchImpl) {
-  return (await requestOk(url(server, "/api/cli/report"), { method: "POST", headers: { authorization: `Bearer ${token}` }, body: payload, fetchImpl })).body;
+  return (await requestOk(url(server, "/api/cli/report"), { method: "POST", headers: { authorization: `Bearer ${token}` }, body: payload, fetchImpl, retries: 0 })).body;
 }

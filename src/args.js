@@ -12,7 +12,7 @@ Usage:
   coderival add cliproxy       Count tokens from a CLIProxyAPI (--url, --key-file, --host-label)
   coderival remove <host>      Remove a forge (all its accounts) or the CLIProxyAPI
   coderival status             Show what is configured
-  coderival schedule           Print a line to run this every hour
+  coderival schedule           Print a line to run this every 6 hours
   coderival proxy collect      Drain the CLIProxyAPI usage queue into daily token totals (runs until stopped)
   coderival proxy service      Print a systemd or launchd service for the collector
 
