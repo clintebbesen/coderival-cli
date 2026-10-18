@@ -29,14 +29,14 @@ This is the whole report. Run `coderival --dry-run` to see your own before anyth
     { "provider": "gitlab", "host": "gitlab.example.com", "username": "dev",
       "days": { "2026-10-17": { "prs": 40, "commits": 120 } } }
   ],
-  "tokens": { "source": "logs", "days": { "2026-10-17": 1172000000 } }
+  "tokens": [{ "source": "logs", "days": { "2026-10-17": 1172000000 } }]
 }
 ```
 
 - `agent.days`: seconds of agent time per UTC day, per tool.
 - `forges`: merged PRs or MRs and commits per UTC day, for forges you add yourself.
-- `tokens`: total tokens per UTC day, from your logs (`"source": "logs"`) or from a CLIProxyAPI
-  (`"source": "cliproxy", "host": "<label>"`). See "How tokens are counted".
+- `tokens`: a list of total tokens per UTC day: this device's logs (`"source": "logs"`) and, on the device
+  that runs the collector, the CLIProxyAPI totals too (`"source": "cliproxy", "host": "<label>"`). See "How tokens are counted".
 - `device`: a random id made on first run and the machine name, so two machines add up instead of overwriting each other.
   Change the name in the config file if you want.
 
@@ -91,8 +91,9 @@ so cache reads dominate and the totals are large (billions a month for a heavy u
   `--agent-pattern`), and keeps only tokens per UTC day in `~/.config/coderival/cliproxy-tokens.json`. Run only
   one collector per proxy, and stop any other tool that drains the same queue. Raise the retention in
   CLIProxyAPI to cover collector restarts.
-- **No double counting:** a device with a CLIProxyAPI sends its proxy totals; other devices still send log
-  totals, and the site ignores device log tokens for any profile that has a proxy source.
+- **No double counting:** every device sends its log totals, and the device running the collector also sends
+  the proxy totals. For each day the site counts the larger of the proxy total and the sum of all devices' log
+  totals, never both. Days before the collector started keep their log totals.
 
 ## Trust label
 

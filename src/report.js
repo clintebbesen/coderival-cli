@@ -13,7 +13,7 @@ import { VERSION } from "./version.js";
  *   window: { from: string, to: string },
  *   agentDays?: Record<string, Record<string, number>>,
  *   forges?: ForgeTotals[],
- *   tokens?: TokenTotals,
+ *   tokens?: TokenTotals[],
  * }} input
  */
 export function buildReport({ device, window, agentDays, forges, tokens }) {

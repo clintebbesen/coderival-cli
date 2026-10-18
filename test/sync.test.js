@@ -110,19 +110,19 @@ test("log tokens are sent by default and --no-tokens leaves them out", async () 
   const config = await tempConfig();
   let printed = "";
   await sync(config, parseCli(["--dry-run", "--no-forges"]), { collectAgents, collect, now, log: () => {}, print: (t) => (printed += t) });
-  assert.deepEqual(JSON.parse(printed).tokens, { source: "logs", days: logTokens });
+  assert.deepEqual(JSON.parse(printed).tokens, [{ source: "logs", days: logTokens }]);
   printed = "";
   await sync(config, parseCli(["--dry-run", "--no-forges", "--no-tokens"]), { collectAgents, collect, now, log: () => {}, print: (t) => (printed += t) });
   assert.equal("tokens" in JSON.parse(printed), false);
 });
 
-test("a configured CLIProxyAPI replaces log tokens with the collected totals", async () => {
+test("a configured CLIProxyAPI is sent next to this device's log tokens", async () => {
   const config = await tempConfig();
   config.cliproxy = { url: "http://proxy.test", hostLabel: "proxy.example", keyFile: "/nope" };
   const loadProxy = async () => ({ host: "proxy.example", days: { "2026-10-17": 9, "2020-01-01": 1 } });
   let printed = "";
   await sync(config, parseCli(["--dry-run", "--no-forges"]), { collectAgents, collect, loadProxy, now, log: () => {}, print: (t) => (printed += t) });
-  assert.deepEqual(JSON.parse(printed).tokens, { source: "cliproxy", host: "proxy.example", days: { "2026-10-17": 9 } });
+  assert.deepEqual(JSON.parse(printed).tokens, [{ source: "logs", days: logTokens }, { source: "cliproxy", host: "proxy.example", days: { "2026-10-17": 9 } }]);
 });
 
 test("forge tokens can come from a command, and quiet runs never start a login", async () => {

@@ -64,15 +64,17 @@ export async function sync(config, options, deps = {}) {
     logTokens = result.tokens;
   }
 
-  /** @type {import("../report.js").TokenTotals | undefined} */
-  let tokens;
+  // This device's log tokens, plus the proxy's totals when this device runs the collector. The server counts
+  // the larger of the two per day, so history from before the collector started is kept.
+  /** @type {import("../report.js").TokenTotals[]} */
+  const tokenList = [];
+  if (options.tokens && logTokens) tokenList.push({ source: "logs", days: logTokens });
   if (options.tokens && config.cliproxy) {
     const stored = await loadProxy();
-    if (stored) tokens = { source: "cliproxy", host: config.cliproxy.hostLabel, days: daysInWindow(stored.days, window) };
-    else logAll(`No token totals collected from ${config.cliproxy.hostLabel} yet; is \`coderival proxy collect\` running? Tokens not sent.`);
-  } else if (options.tokens && logTokens) {
-    tokens = { source: "logs", days: logTokens };
+    if (stored) tokenList.push({ source: "cliproxy", host: config.cliproxy.hostLabel, days: daysInWindow(stored.days, window) });
+    else logAll(`No token totals collected from ${config.cliproxy.hostLabel} yet; is \`coderival proxy collect\` running? Proxy tokens not sent.`);
   }
+  const tokens = tokenList.length ? tokenList : undefined;
 
   /** @type {import("../report.js").ForgeTotals[] | undefined} */
   let forges;
@@ -127,7 +129,7 @@ function oneLine(report, since) {
     const seconds = Object.values(sumSince(report.agent.days, since)).reduce((a, b) => a + b, 0);
     parts.push(`agent ${(seconds / 3600).toFixed(1)}h`);
   }
-  if (report.tokens) parts.push(`tokens ${formatTokens(sumTokens(report.tokens.days, since))} (${report.tokens.source})`);
+  for (const t of report.tokens ?? []) parts.push(`tokens ${formatTokens(sumTokens(t.days, since))} (${t.source})`);
   if (report.forges) parts.push(`${report.forges.length} forge${report.forges.length === 1 ? "" : "s"}`);
   return `last 30 days ${parts.join(", ") || "nothing"}.`;
 }
@@ -158,7 +160,7 @@ function summarise(report, since, log) {
     const parts = Object.entries(totals).map(([tool, seconds]) => `${tool} ${(seconds / 3600).toFixed(1)}h`);
     log(`  agent hours: ${parts.length ? parts.join(", ") : "none"}`);
   }
-  if (report.tokens) log(`  tokens: ${formatTokens(sumTokens(report.tokens.days, since))} (from ${report.tokens.source === "cliproxy" ? report.tokens.host : "Claude Code and Codex logs"})`);
+  for (const t of report.tokens ?? []) log(`  tokens: ${formatTokens(sumTokens(t.days, since))} (from ${t.source === "cliproxy" ? t.host : "Claude Code and Codex logs"})`);
   for (const forge of report.forges ?? []) {
     const totals = sumSince(forge.days, since);
     log(`  ${forge.username} on ${forge.host}: ${totals.prs ?? 0} merged, ${totals.commits ?? 0} commits`);
