@@ -1,15 +1,19 @@
 // @ts-check
 // Local config. It holds the CodeRival token and any forge tokens, so it is always written mode 600.
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
+import { writeJsonAtomic } from "./files.js";
 
 export const DEFAULT_SERVER = "https://coderival.cesolutions.dev";
 
 /**
- * @typedef {{ provider: "github" | "gitlab", host: string, apiBase: string, username: string, token: string }} Forge
- * @typedef {{ server: string, token?: string, deviceId: string, deviceName: string, forges: Forge[], lastSync?: string }} Config
+ * A forge keeps either a token or a command that prints one (for example `gh auth token`), never both.
+ * @typedef {{ provider: "github" | "gitlab", host: string, apiBase: string, username: string, token?: string, tokenCommand?: string }} Forge
+ * The CLIProxyAPI management key is read from keyFile at use; it is never copied into this config.
+ * @typedef {{ url: string, hostLabel: string, keyFile: string, agentPattern?: string }} CliProxy
+ * @typedef {{ server: string, token?: string, deviceId: string, deviceName: string, forges: Forge[], cliproxy?: CliProxy, lastSync?: string }} Config
  */
 
 /** @param {NodeJS.ProcessEnv} [env] */
@@ -36,6 +40,7 @@ export async function loadConfig(path = configPath()) {
     deviceId: stored.deviceId || randomUUID(),
     deviceName: stored.deviceName || hostname(),
     forges: Array.isArray(stored.forges) ? stored.forges : [],
+    ...(stored.cliproxy ? { cliproxy: stored.cliproxy } : {}),
     lastSync: stored.lastSync,
   };
 }
@@ -46,9 +51,5 @@ export async function loadConfig(path = configPath()) {
  * @param {string} [path]
  */
 export async function saveConfig(config, path = configPath()) {
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-  const temp = `${path}.${process.pid}.tmp`;
-  await writeFile(temp, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
-  await chmod(temp, 0o600);
-  await rename(temp, path);
+  await writeJsonAtomic(path, config);
 }

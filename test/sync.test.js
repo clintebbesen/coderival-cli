@@ -13,7 +13,8 @@ import { fakeFetch } from "./helpers.js";
 
 const now = new Date("2026-10-18T05:00:00Z");
 const agentDays = { "2026-10-17": { claude: 3600, codex: 60 } };
-const collectAgents = async () => ({ days: agentDays, files: { claude: 1, codex: 1 } });
+const logTokens = { "2026-10-17": 5_000_000 };
+const collectAgents = async () => ({ days: agentDays, tokens: logTokens, files: { claude: 1, codex: 1 } });
 const forgeDays = { "2026-10-16": { prs: 2, commits: 5 }, "2026-10-15": { prs: 0, commits: 0 } };
 const collect = async () => forgeDays;
 
@@ -103,4 +104,35 @@ test("--days is validated", () => {
 test("package.json version matches the client version", async () => {
   const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   assert.equal(pkg.version, VERSION);
+});
+
+test("log tokens are sent by default and --no-tokens leaves them out", async () => {
+  const config = await tempConfig();
+  let printed = "";
+  await sync(config, parseCli(["--dry-run", "--no-forges"]), { collectAgents, collect, now, log: () => {}, print: (t) => (printed += t) });
+  assert.deepEqual(JSON.parse(printed).tokens, { source: "logs", days: logTokens });
+  printed = "";
+  await sync(config, parseCli(["--dry-run", "--no-forges", "--no-tokens"]), { collectAgents, collect, now, log: () => {}, print: (t) => (printed += t) });
+  assert.equal("tokens" in JSON.parse(printed), false);
+});
+
+test("a configured CLIProxyAPI replaces log tokens with the collected totals", async () => {
+  const config = await tempConfig();
+  config.cliproxy = { url: "http://proxy.test", hostLabel: "proxy.example", keyFile: "/nope" };
+  const loadProxy = async () => ({ host: "proxy.example", days: { "2026-10-17": 9, "2020-01-01": 1 } });
+  let printed = "";
+  await sync(config, parseCli(["--dry-run", "--no-forges"]), { collectAgents, collect, loadProxy, now, log: () => {}, print: (t) => (printed += t) });
+  assert.deepEqual(JSON.parse(printed).tokens, { source: "cliproxy", host: "proxy.example", days: { "2026-10-17": 9 } });
+});
+
+test("forge tokens can come from a command, and quiet runs never start a login", async () => {
+  const config = await tempConfig();
+  config.forges = [{ provider: "github", host: "github.com", apiBase: "https://api.github.com", username: "dev", tokenCommand: "gh auth token" }];
+  /** @type {string[]} */
+  const used = [];
+  const collectSpy = async (/** @type {any} */ forge) => { used.push(forge.token); return forgeDays; };
+  await sync(config, parseCli(["--dry-run", "--no-agents"]), { collect: collectSpy, tokenFor: async () => "from-command", now, log: () => {}, print: () => {} });
+  assert.deepEqual(used, ["from-command"]);
+  await assert.rejects(sync(config, parseCli(["--quiet"]), { collectAgents, collect, now, log: () => {} }), /Not logged in/);
+  await assert.rejects(sync(config, parseCli(["--no-login"]), { collectAgents, collect, now, log: () => {} }), /Not logged in/);
 });

@@ -3,6 +3,7 @@
 import { HELP, parseCli } from "../src/args.js";
 import { addForge, removeForge } from "../src/commands/forges.js";
 import { login, logout } from "../src/commands/login.js";
+import { addCliProxy, proxyCollect, proxyService } from "../src/commands/proxy.js";
 import { schedule, status } from "../src/commands/status.js";
 import { sync } from "../src/commands/sync.js";
 import { loadConfig } from "../src/config.js";
@@ -28,7 +29,13 @@ async function main() {
       await logout(config);
       return;
     case "add":
-      await addForge(config, options.rest[0], options);
+      if (options.rest[0] === "cliproxy") await addCliProxy(config, options);
+      else await addForge(config, options.rest[0], options);
+      return;
+    case "proxy":
+      if (options.rest[0] === "collect") await proxyCollect(config, options);
+      else if (options.rest[0] === "service") proxyService();
+      else throw new Error("Usage: coderival proxy collect|service");
       return;
     case "remove":
       await removeForge(config, options.rest[0]);
